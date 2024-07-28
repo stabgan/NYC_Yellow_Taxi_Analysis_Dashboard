@@ -1,0 +1,9 @@
+pandas
+pyarrow
+matplotlib
+seaborn
+pyspark
+sqlalchemy
+psycopg2-binary
+plotly
+psutil
