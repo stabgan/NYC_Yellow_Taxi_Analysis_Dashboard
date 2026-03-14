@@ -1,9 +1,6 @@
-pandas
-pyarrow
-matplotlib
-seaborn
-pyspark
-sqlalchemy
-psycopg2-binary
-plotly
-psutil
+pandas>=2.0
+pyarrow>=14.0
+pyspark>=3.5
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+plotly>=5.18

@@ -24,10 +24,18 @@ def analyze_column(df, column_name):
     print(f"Stats:\n{col_stats}")
 
     # Calculate mode for numeric columns or most common value for object columns
-    if col_type in ['int64', 'float64']:
-        print(f"Mode: {df[column_name].mode().values[0]}")
-    elif col_type == 'object':
-        print(f"Most common value: {df[column_name].value_counts().index[0]}")
+    if pd.api.types.is_numeric_dtype(df[column_name]):
+        mode_values = df[column_name].mode()
+        if not mode_values.empty:
+            print(f"Mode: {mode_values.values[0]}")
+        else:
+            print("Mode: N/A (no non-null values)")
+    elif pd.api.types.is_object_dtype(df[column_name]):
+        value_counts = df[column_name].value_counts()
+        if not value_counts.empty:
+            print(f"Most common value: {value_counts.index[0]}")
+        else:
+            print("Most common value: N/A (no non-null values)")
 
     # Print additional information about the column
     print(f"Null values: {df[column_name].isnull().sum()}")
@@ -66,16 +74,16 @@ def main():
         analyze_column(df, column)
 
         # Create distribution plots for numeric columns
-        if df[column].dtype in ['int64', 'float64']:
+        if pd.api.types.is_numeric_dtype(df[column]):
             plot_distribution(df, column)
 
     # Create and save correlation heatmap
-    numeric_df = df.select_dtypes(include=['float64', 'int64'])
-    corr_matrix = numeric_df.corr()
+    numeric_df = df.select_dtypes(include=[np.number])
+    corr_matrix = numeric_df.corr(numeric_only=True)
     fig = go.Figure(data=go.Heatmap(
         z=corr_matrix.values,
-        x=corr_matrix.columns,
-        y=corr_matrix.index,
+        x=corr_matrix.columns.tolist(),
+        y=corr_matrix.index.tolist(),
         colorscale='RdBu',
         zmin=-1, zmax=1
     ))
