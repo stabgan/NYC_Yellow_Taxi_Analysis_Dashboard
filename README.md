@@ -1,52 +1,40 @@
-# 🚕 NYC Yellow Taxi Analysis Dashboard
+# NYC Yellow Taxi Analysis Dashboard
 
-End-to-end data analysis pipeline for NYC Yellow Taxi trip data (January 2024), featuring interactive EDA, Pandas vs. PySpark benchmarking, and a Grafana dashboard backed by PostgreSQL.
+End-to-end data analysis pipeline for NYC Yellow Taxi trip data (Jan 2024), with EDA, Pandas vs. Spark benchmarking, and a Grafana dashboard powered by PostgreSQL.
 
 > IIT Madras — Data Science Project (CH23M514)
 
----
+## What It Does
 
-## 📖 Description
+This project analyzes the [NYC TLC Yellow Taxi trip records](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) and provides:
 
-This project processes and visualizes the [NYC TLC Yellow Taxi trip records](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) through three stages:
+- Exploratory Data Analysis (EDA) with interactive Plotly visualizations (distributions, correlation heatmaps)
+- A performance comparison between Pandas and PySpark for data loading and aggregation at different scales (10% sample vs. full dataset)
+- Data preparation pipeline that aggregates hourly and daily trip statistics and loads them into PostgreSQL for Grafana dashboards
 
-1. **Exploratory Data Analysis** — column-level statistics, distribution histograms, and a correlation heatmap, all rendered as interactive Plotly HTML files.
-2. **Performance Benchmarking** — side-by-side comparison of Pandas and PySpark for data loading and aggregation on both a 10 % sample and the full dataset.
-3. **Dashboard Pipeline** — aggregates hourly and daily trip statistics and loads them into PostgreSQL so Grafana can serve live dashboards.
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| 🐍 Language | Python 3.10+ |
-| 📊 Data I/O | Pandas, PyArrow (Parquet) |
-| ⚡ Big Data | PySpark |
-| 📈 Visualization | Plotly |
-| 🐘 Database | PostgreSQL (SQLAlchemy + psycopg2) |
-| 📉 Dashboard | Grafana |
-
----
-
-## 📦 Dependencies
-
-Listed in `requirements.txt`:
+## Project Structure
 
 ```
-pandas>=2.0
-pyarrow>=14.0
-pyspark>=3.5
-sqlalchemy>=2.0
-psycopg2-binary>=2.9
-plotly>=5.18
+├── EDA.py                        # Exploratory data analysis (column stats, distributions, correlation)
+├── compare_pandas_vs_spark.py    # Pandas vs. PySpark performance benchmark
+├── prepare_data_for_grafana.py   # Aggregates data and loads into PostgreSQL for Grafana
+├── list_columns.py               # Utility: prints columns and exports CSV
+├── requirements.txt              # Python dependencies
+├── LICENSE                       # MIT
 ```
 
-PySpark also requires a **Java 11+** runtime.
+## Tech Stack
 
----
+| Layer          | Technology                          |
+|----------------|-------------------------------------|
+| Language       | Python 3                            |
+| Data I/O       | Pandas, PyArrow (Parquet)           |
+| Big Data       | PySpark                             |
+| Visualization  | Plotly                              |
+| Database       | PostgreSQL (via SQLAlchemy, psycopg2)|
+| Dashboard      | Grafana                             |
 
-## 🚀 How to Run
+## Setup & Run
 
 ### 1. Install dependencies
 
@@ -54,67 +42,48 @@ PySpark also requires a **Java 11+** runtime.
 pip install -r requirements.txt
 ```
 
-### 2. Download the data
+### 2. Get the data
 
-Grab the **January 2024** Yellow Taxi Parquet file from the [NYC TLC website](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) and place it at:
+Download the January 2024 Yellow Taxi Parquet file from the [NYC TLC website](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) and place it at:
 
 ```
 data/yellow_tripdata_2024-01.parquet
 ```
 
-### 3. Run Exploratory Data Analysis
+### 3. Run EDA
 
 ```bash
 python EDA.py
 ```
 
-Interactive HTML plots are saved to `EDA_output/`.
+Outputs interactive HTML plots to `EDA_output/`.
 
-### 4. Benchmark Pandas vs. PySpark
+### 4. Benchmark Pandas vs. Spark
 
 ```bash
 python compare_pandas_vs_spark.py
 ```
 
-Comparison charts are saved to `Analysis_output/`. Requires a working Java + Spark installation.
+Outputs comparison charts to `Analysis_output/`. Requires a working Spark/Java installation.
 
 ### 5. Load data into PostgreSQL for Grafana
-
-Set your database credentials via environment variables (or accept the defaults):
-
-```bash
-export POSTGRES_USER=postgres
-export POSTGRES_PASSWORD=changeme
-export POSTGRES_HOST=localhost
-export POSTGRES_PORT=5432
-export POSTGRES_DB=nyc_taxi_db
-```
-
-Then run:
 
 ```bash
 python prepare_data_for_grafana.py
 ```
 
-Connect Grafana to `nyc_taxi_db` and build dashboards from the `hourly_stats` and `daily_stats` tables.
+Expects a local PostgreSQL instance with database `nyc_taxi_db`. Default credentials are hardcoded in the script — update them before running.
 
-### 6. Utility — list columns
+Then connect Grafana to the `nyc_taxi_db` database and build dashboards from the `hourly_stats` and `daily_stats` tables.
 
-```bash
-python list_columns.py            # print column names
-python list_columns.py --export   # also export full CSV
-```
+## Known Issues
 
----
+- **Hardcoded DB credentials** — `prepare_data_for_grafana.py` has plaintext `postgres`/`1234` credentials. Use environment variables or a `.env` file instead.
+- **No data included** — The Parquet data file is not in the repo. You must download it manually.
+- **No Grafana config** — Dashboard JSON/provisioning files are not included; Grafana setup is manual.
+- **Spark dependency** — `compare_pandas_vs_spark.py` requires Java and a Spark installation, which is not documented.
+- **No `.gitignore`** — Output directories and data files are not excluded from version control.
 
-## ⚠️ Known Issues
-
-- **No data included** — the Parquet file is not in the repo; download it manually from the NYC TLC site.
-- **No Grafana provisioning** — dashboard JSON and datasource configs are not included; Grafana setup is manual.
-- **Spark / Java dependency** — `compare_pandas_vs_spark.py` requires Java 11+ and a Spark installation, which must be configured separately.
-
----
-
-## 📄 License
+## License
 
 MIT — see [LICENSE](LICENSE).

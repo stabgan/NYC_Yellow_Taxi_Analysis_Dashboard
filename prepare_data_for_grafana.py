@@ -26,11 +26,8 @@ def aggregate_data(df):
     Returns:
         tuple: A tuple containing two DataFrames (hourly_stats, daily_stats).
     """
-    pickup_dt = pd.to_datetime(df['tpep_pickup_datetime'])
-
     # Hourly statistics
-    df = df.copy()
-    df['hour'] = pickup_dt.dt.hour
+    df['hour'] = pd.to_datetime(df['tpep_pickup_datetime']).dt.hour
     hourly_stats = df.groupby('hour').agg({
         'trip_distance': 'mean',
         'fare_amount': 'mean',
@@ -41,7 +38,7 @@ def aggregate_data(df):
     hourly_stats.columns = ['hour', 'avg_distance', 'avg_fare', 'avg_tip', 'avg_total', 'trip_count']
 
     # Daily statistics
-    df['date'] = pickup_dt.dt.date
+    df['date'] = pd.to_datetime(df['tpep_pickup_datetime']).dt.date
     daily_stats = df.groupby('date').agg({
         'trip_distance': 'mean',
         'fare_amount': 'mean',
@@ -79,17 +76,14 @@ def main():
     # Aggregate the data into hourly and daily statistics
     hourly_stats, daily_stats = aggregate_data(df)
 
-    # PostgreSQL connection details from environment variables (with defaults)
-    db_user = os.environ.get('POSTGRES_USER', 'postgres')
-    db_pass = os.environ.get('POSTGRES_PASSWORD', 'changeme')
-    db_host = os.environ.get('POSTGRES_HOST', 'localhost')
-    db_port = os.environ.get('POSTGRES_PORT', '5432')
-    db_name = os.environ.get('POSTGRES_DB', 'nyc_taxi_db')
+    # PostgreSQL connection details
+    db_user = 'postgres'
+    db_pass = '1234'
+    db_host = 'localhost'
+    db_name = 'nyc_taxi_db'
 
     # Create SQLAlchemy engine for PostgreSQL connection
-    engine = create_engine(
-        f'postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
-    )
+    engine = create_engine(f'postgresql://{db_user}:{db_pass}@{db_host}/{db_name}')
 
     # Load aggregated data into PostgreSQL
     load_to_postgres(hourly_stats, 'hourly_stats', engine)

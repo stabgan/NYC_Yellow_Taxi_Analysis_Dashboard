@@ -10,13 +10,6 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def get_spark_session():
-    """
-    Create or retrieve a reusable Spark session.
-    """
-    return SparkSession.builder.appName("NYCTaxiAnalysis").getOrCreate()
-
-
 def load_data_pandas(file_path, sample_fraction=None):
     """
     Load data using Pandas, optionally sampling a fraction of the data.
@@ -30,17 +23,18 @@ def load_data_pandas(file_path, sample_fraction=None):
     return df
 
 
-def load_data_spark(spark, file_path, sample_ratio=1.0):
+def load_data_spark(file_path, sample_ratio=1.0):
     """
     Load data using Spark, optionally sampling a fraction of the data.
     """
+    spark = SparkSession.builder.appName("NYCTaxiAnalysis").getOrCreate()
     start_time = time.time()
     df = spark.read.parquet(file_path)
     if sample_ratio < 1.0:
-        df = df.sample(fraction=sample_ratio)
+        df = df.sample(sample_ratio)
     end_time = time.time()
     print(f"Spark loading time: {end_time - start_time:.2f} seconds")
-    return df
+    return df, spark
 
 
 def analyze_pandas(df):
@@ -50,7 +44,6 @@ def analyze_pandas(df):
     start_time = time.time()
 
     # Calculate average fare amount by hour
-    df = df.copy()
     df['hour'] = pd.to_datetime(df['tpep_pickup_datetime']).dt.hour
     hourly_fares = df.groupby('hour')['fare_amount'].mean().reset_index()
 
@@ -62,7 +55,7 @@ def analyze_pandas(df):
     print(f"Pandas analysis time: {end_time - start_time:.2f} seconds")
 
 
-def analyze_spark(df):
+def analyze_spark(df, spark):
     """
     Perform analysis on the DataFrame using Spark and generate a visualization.
     """
@@ -92,33 +85,30 @@ def main():
     file_path = 'data/yellow_tripdata_2024-01.parquet'
     os.makedirs('Analysis_output', exist_ok=True)
 
-    spark = get_spark_session()
+    # Analyze small dataset (10% of full data)
+    print("Analyzing small dataset:")
 
-    try:
-        # Analyze small dataset (10% of full data)
-        print("Analyzing small dataset:")
+    print("Pandas:")
+    df_pandas_small = load_data_pandas(file_path, sample_fraction=0.1)
+    analyze_pandas(df_pandas_small)
 
-        print("Pandas:")
-        df_pandas_small = load_data_pandas(file_path, sample_fraction=0.1)
-        analyze_pandas(df_pandas_small)
+    print("\nSpark:")
+    df_spark_small, spark = load_data_spark(file_path, sample_ratio=0.1)
+    analyze_spark(df_spark_small, spark)
 
-        print("\nSpark:")
-        df_spark_small = load_data_spark(spark, file_path, sample_ratio=0.1)
-        analyze_spark(df_spark_small)
+    # Analyze full dataset
+    print("\nAnalyzing full dataset:")
 
-        # Analyze full dataset
-        print("\nAnalyzing full dataset:")
+    print("Pandas:")
+    df_pandas_full = load_data_pandas(file_path)
+    analyze_pandas(df_pandas_full)
 
-        print("Pandas:")
-        df_pandas_full = load_data_pandas(file_path)
-        analyze_pandas(df_pandas_full)
+    print("\nSpark:")
+    df_spark_full, spark = load_data_spark(file_path)
+    analyze_spark(df_spark_full, spark)
 
-        print("\nSpark:")
-        df_spark_full = load_data_spark(spark, file_path)
-        analyze_spark(df_spark_full)
-    finally:
-        # Always stop the Spark session
-        spark.stop()
+    # Stop the Spark session
+    spark.stop()
 
 
 if __name__ == "__main__":
