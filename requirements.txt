@@ -1,9 +1,6 @@
 pandas
 pyarrow
-matplotlib
-seaborn
+plotly
 pyspark
 sqlalchemy
 psycopg2-binary
-plotly
-psutil

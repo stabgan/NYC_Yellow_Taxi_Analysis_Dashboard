@@ -1,12 +1,12 @@
+import os
+import time
+import warnings
+
 import pandas as pd
 import plotly.express as px
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import hour, avg
-import time
-import os
-import warnings
+from pyspark.sql.functions import avg, hour
 
-# Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
 
@@ -18,97 +18,107 @@ def load_data_pandas(file_path, sample_fraction=None):
     df = pd.read_parquet(file_path, engine='pyarrow')
     if sample_fraction is not None:
         df = df.sample(frac=sample_fraction)
-    end_time = time.time()
-    print(f"Pandas loading time: {end_time - start_time:.2f} seconds")
+    elapsed = time.time() - start_time
+    print(f"Pandas loading time: {elapsed:.2f} seconds")
     return df
 
 
-def load_data_spark(file_path, sample_ratio=1.0):
+def load_data_spark(spark, file_path, sample_ratio=1.0):
     """
-    Load data using Spark, optionally sampling a fraction of the data.
+    Load data using an existing Spark session, optionally sampling.
     """
-    spark = SparkSession.builder.appName("NYCTaxiAnalysis").getOrCreate()
     start_time = time.time()
     df = spark.read.parquet(file_path)
     if sample_ratio < 1.0:
-        df = df.sample(sample_ratio)
-    end_time = time.time()
-    print(f"Spark loading time: {end_time - start_time:.2f} seconds")
-    return df, spark
+        df = df.sample(fraction=sample_ratio)
+    elapsed = time.time() - start_time
+    print(f"Spark loading time: {elapsed:.2f} seconds")
+    return df
 
 
-def analyze_pandas(df):
+def analyze_pandas(df, output_dir):
     """
     Perform analysis on the DataFrame using Pandas and generate a visualization.
     """
     start_time = time.time()
 
-    # Calculate average fare amount by hour
+    df = df.copy()
     df['hour'] = pd.to_datetime(df['tpep_pickup_datetime']).dt.hour
     hourly_fares = df.groupby('hour')['fare_amount'].mean().reset_index()
 
-    # Create and save the visualization
-    fig = px.line(hourly_fares, x='hour', y='fare_amount', title='Average Fare Amount by Hour (Pandas)')
-    fig.write_html(f"Analysis_output/hourly_fares_pandas_{len(df)}.html")
+    fig = px.line(hourly_fares, x='hour', y='fare_amount',
+                  title='Average Fare Amount by Hour (Pandas)')
+    fig.write_html(os.path.join(output_dir, f"hourly_fares_pandas_{len(df)}.html"))
 
-    end_time = time.time()
-    print(f"Pandas analysis time: {end_time - start_time:.2f} seconds")
+    elapsed = time.time() - start_time
+    print(f"Pandas analysis time: {elapsed:.2f} seconds")
 
 
-def analyze_spark(df, spark):
+def analyze_spark(df, output_dir):
     """
     Perform analysis on the DataFrame using Spark and generate a visualization.
     """
     start_time = time.time()
 
-    # Calculate average fare amount by hour
-    hourly_fares = df.withColumn('hour', hour('tpep_pickup_datetime')) \
-        .groupBy('hour') \
-        .agg(avg('fare_amount').alias('avg_fare')) \
+    hourly_fares = (
+        df.withColumn('hour', hour('tpep_pickup_datetime'))
+        .groupBy('hour')
+        .agg(avg('fare_amount').alias('avg_fare'))
         .orderBy('hour')
+    )
 
-    # Convert to Pandas for visualization
     hourly_fares_pd = hourly_fares.toPandas()
 
-    # Create and save the visualization
-    fig = px.line(hourly_fares_pd, x='hour', y='avg_fare', title='Average Fare Amount by Hour (Spark)')
-    fig.write_html(f"Analysis_output/hourly_fares_spark_{df.count()}.html")
+    fig = px.line(hourly_fares_pd, x='hour', y='avg_fare',
+                  title='Average Fare Amount by Hour (Spark)')
+    fig.write_html(os.path.join(output_dir, f"hourly_fares_spark_{df.count()}.html"))
 
-    end_time = time.time()
-    print(f"Spark analysis time: {end_time - start_time:.2f} seconds")
+    elapsed = time.time() - start_time
+    print(f"Spark analysis time: {elapsed:.2f} seconds")
 
 
 def main():
     """
     Main function to orchestrate the data loading and analysis process.
     """
-    file_path = 'data/yellow_tripdata_2024-01.parquet'
-    os.makedirs('Analysis_output', exist_ok=True)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, 'data', 'yellow_tripdata_2024-01.parquet')
+    output_dir = os.path.join(script_dir, 'Analysis_output')
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Analyze small dataset (10% of full data)
-    print("Analyzing small dataset:")
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(
+            f"Data file not found: {file_path}\n"
+            "Download it from https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page"
+        )
 
-    print("Pandas:")
-    df_pandas_small = load_data_pandas(file_path, sample_fraction=0.1)
-    analyze_pandas(df_pandas_small)
+    # Create a single Spark session for the entire run
+    spark = SparkSession.builder.appName("NYCTaxiAnalysis").getOrCreate()
 
-    print("\nSpark:")
-    df_spark_small, spark = load_data_spark(file_path, sample_ratio=0.1)
-    analyze_spark(df_spark_small, spark)
+    try:
+        # --- Small dataset (10 % sample) ---
+        print("Analyzing small dataset (10% sample):")
 
-    # Analyze full dataset
-    print("\nAnalyzing full dataset:")
+        print("  Pandas:")
+        df_pandas_small = load_data_pandas(file_path, sample_fraction=0.1)
+        analyze_pandas(df_pandas_small, output_dir)
 
-    print("Pandas:")
-    df_pandas_full = load_data_pandas(file_path)
-    analyze_pandas(df_pandas_full)
+        print("  Spark:")
+        df_spark_small = load_data_spark(spark, file_path, sample_ratio=0.1)
+        analyze_spark(df_spark_small, output_dir)
 
-    print("\nSpark:")
-    df_spark_full, spark = load_data_spark(file_path)
-    analyze_spark(df_spark_full, spark)
+        # --- Full dataset ---
+        print("\nAnalyzing full dataset:")
 
-    # Stop the Spark session
-    spark.stop()
+        print("  Pandas:")
+        df_pandas_full = load_data_pandas(file_path)
+        analyze_pandas(df_pandas_full, output_dir)
+
+        print("  Spark:")
+        df_spark_full = load_data_spark(spark, file_path)
+        analyze_spark(df_spark_full, output_dir)
+    finally:
+        spark.stop()
 
 
 if __name__ == "__main__":
